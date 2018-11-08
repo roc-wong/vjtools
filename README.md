@@ -5,7 +5,7 @@
 
 各位看官看着是好的，烦请“Star”。
 
-[1.0.5 VJTop黄金2版](https://github.com/vipshop/vjtools/releases/tag/v.1.0.5) - 2018.8.24
+[1.0.6 中秋国庆版](https://github.com/vipshop/vjtools/releases/tag/v.1.0.6) - 2018.9.24
 
 ## Java Standard
 
@@ -28,8 +28,8 @@
 
 | Project | Description | Manual |
 | -------- | -------- | -------- |
-| [vjtop](/vjtop)  | 观察JVM进程指标及其繁忙线程 | [Chinese](/vjtop/README.md), [English](/vjtop/README_EN.md)|
-| [vjmap](/vjmap)  | JMAP的分代打印版 |[Chinese](/vjmap/README.md), [English](/vjmap/README_EN.md)|
+| [vjtop](/vjtop)  | 观察JVM进程指标及其繁忙线程 | [Chinese](/vjtop/README.md)|
+| [vjmap](/vjmap)  | JMAP的分代打印版 |[Chinese](/vjmap/README.md)|
 | [vjdump](/vjdump)  | 线上紧急收集JVM数据脚本 | [Chinese](/vjdump/README.md), [English](/vjdump/README_EN.md)|
 | [vjmxcli](/vjmxcli)  | JMX 查看工具 | [Chinese](/vjmxcli/README.md)|
 

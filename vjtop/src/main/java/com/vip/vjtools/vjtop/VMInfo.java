@@ -46,6 +46,7 @@ public class VMInfo {
 	public boolean processDataSupport = true;
 	public boolean threadCpuTimeSupported;
 	public boolean threadMemoryAllocatedSupported;
+	public boolean threadContentionMonitoringSupported;
 
 	public WarningRule warningRule = new WarningRule();
 
@@ -187,15 +188,17 @@ public class VMInfo {
 				.parseLong(jmxClient.getHotSpotDiagnosticMXBean().getVMOption("MaxDirectMemorySize").getValue());
 		maxDirectMemorySize = maxDirectMemorySize == 0 ? -1 : maxDirectMemorySize;
 
-		threadCpuTimeSupported = jmxClient.getThreadMXBean().isThreadCpuTimeSupported();
-		threadMemoryAllocatedSupported = jmxClient.getThreadMXBean().isThreadAllocatedMemorySupported();
-
 		processors = jmxClient.getOperatingSystemMXBean().getAvailableProcessors();
 		warningRule.updateProcessor(processors);
 
 		isLinux = System.getProperty("os.name").toLowerCase(Locale.US).contains("linux");
 	}
 
+	public void initThreadInfoAbility() throws IOException {
+		threadCpuTimeSupported = jmxClient.getThreadMXBean().isThreadCpuTimeSupported();
+		threadMemoryAllocatedSupported = jmxClient.getThreadMXBean().isThreadAllocatedMemorySupported();
+		threadContentionMonitoringSupported = jmxClient.getThreadMXBean().isThreadContentionMonitoringEnabled();
+	}
 
 	/**
 	 * Updates all jvm metrics to the most recent remote values
@@ -376,14 +379,20 @@ public class VMInfo {
 		if (perfDataSupport) {
 			ygcCount.update(ygcCountCounter.longValue());
 			ygcTimeMills.update(perfData.tickToMills(ygcTimeCounter));
-			fullgcCount.update(fullGcCountCounter.longValue());
-			fullgcTimeMills.update(perfData.tickToMills(fullgcTimeCounter));
+			if (fullGcCountCounter != null) {
+				fullgcCount.update(fullGcCountCounter.longValue());
+				fullgcTimeMills.update(perfData.tickToMills(fullgcTimeCounter));
+			}
 		} else if (isJmxStateOk()) {
 			try {
 				ygcCount.update(jmxClient.getGarbageCollectorManager().getYoungCollector().getCollectionCount());
 				ygcTimeMills.update(jmxClient.getGarbageCollectorManager().getYoungCollector().getCollectionTime());
-				fullgcCount.update(jmxClient.getGarbageCollectorManager().getFullCollector().getCollectionCount());
-				fullgcTimeMills.update(jmxClient.getGarbageCollectorManager().getFullCollector().getCollectionTime());
+
+				if (jmxClient.getGarbageCollectorManager().getFullCollector() != null) {
+					fullgcCount.update(jmxClient.getGarbageCollectorManager().getFullCollector().getCollectionCount());
+					fullgcTimeMills
+							.update(jmxClient.getGarbageCollectorManager().getFullCollector().getCollectionTime());
+				}
 			} catch (Exception e) {
 				handleJmxFetchDataError(e);
 			}
@@ -417,12 +426,16 @@ public class VMInfo {
 		return jmxClient.getThreadMXBean().getThreadInfo(tids);
 	}
 
+	public ThreadInfo getThreadInfo(long tid, int maxDepth) throws IOException {
+		return jmxClient.getThreadMXBean().getThreadInfo(tid, maxDepth);
+	}
+
 	public ThreadInfo[] getThreadInfo(long[] tids, int maxDepth) throws IOException {
 		return jmxClient.getThreadMXBean().getThreadInfo(tids, maxDepth);
 	}
 
-	public ThreadInfo getThreadInfo(long tid, int maxDepth) throws IOException {
-		return jmxClient.getThreadMXBean().getThreadInfo(tid, maxDepth);
+	public ThreadInfo[] getAllThreadInfo() throws IOException {
+		return jmxClient.getThreadMXBean().dumpAllThreads(false, false);
 	}
 
 	public long[] getThreadAllocatedBytes(long[] tids) throws IOException {

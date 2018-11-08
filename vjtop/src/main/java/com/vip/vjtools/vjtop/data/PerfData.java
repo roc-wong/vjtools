@@ -21,9 +21,9 @@ public class PerfData {
 
 	private final Map<String, Counter> counters;
 
-	public static PerfData connect(long pid) {
+	public static PerfData connect(int pid) {
 		try {
-			return new PerfData((int) pid);
+			return new PerfData(pid);
 		} catch (ThreadDeath e) {
 			throw e;
 		} catch (OutOfMemoryError e) {
@@ -43,7 +43,7 @@ public class PerfData {
 	}
 
 	private Map<String, Counter> buildAllCounters() {
-		Map<String, Counter> result = new HashMap<String, Counter>(512);
+		Map<String, Counter> result = new HashMap<>(512);
 
 		for (Counter c : instr.getAllCounters()) {
 			result.put(c.getName(), c);

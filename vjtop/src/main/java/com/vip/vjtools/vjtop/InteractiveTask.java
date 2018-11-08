@@ -13,6 +13,7 @@ public class InteractiveTask implements Runnable {
 	private VJTop app;
 	private Console console;
 	private PrintStream tty;
+	private String inputWhenWaitForEnter;
 
 	public InteractiveTask(VJTop app) {
 		this.app = app;
@@ -34,9 +35,15 @@ public class InteractiveTask implements Runnable {
 
 		while (true) {
 			try {
-				String command = readLine("");
-				if (command == null) {
-					break;
+				String command;
+				if (inputWhenWaitForEnter != null && inputWhenWaitForEnter.length() > 0) {
+					command = inputWhenWaitForEnter;
+					inputWhenWaitForEnter = null;
+				} else {
+					command = readLine("");
+					if (command == null) {
+						break;
+					}
 				}
 
 				handleCommand(command.toLowerCase());
@@ -50,12 +57,14 @@ public class InteractiveTask implements Runnable {
 	}
 
 	public void handleCommand(String command) throws Exception {
-		if (command.equals("t") || command.startsWith("t ")) {
+		if (command.equals("s") || command.startsWith("s ")) {
 			printStacktrace(command);
-		} else if (command.equals("s")) {
-			printTopStack();
+		} else if (command.equals("t")) {
+			printTopThreadsStack();
+		} else if (command.equals("b")) {
+			printBlockedThreadsStack();
 		} else if (command.equals("a")) {
-			displayAllThreads();
+			printAllThreadsName();
 		} else if (command.equals("m")) {
 			changeDisplayMode();
 		} else if (command.equals("i") || command.startsWith("i ")) {
@@ -70,6 +79,7 @@ public class InteractiveTask implements Runnable {
 		} else if (command.equals("h") || command.equals("help")) {
 			printHelp();
 		} else if (command.equals("")) {
+			// do nothing
 		} else {
 			tty.println(" Unkown command: " + command + ", available options:");
 			printHelp();
@@ -87,7 +97,7 @@ public class InteractiveTask implements Runnable {
 
 		try {
 			long pid = Long.parseLong(pidStr);
-			app.view.printStack(pid);
+			app.view.threadPrinter.printStack(pid);
 			waitForEnter();
 		} catch (NumberFormatException e) {
 			tty.println(" Wrong number format for pid");
@@ -96,20 +106,30 @@ public class InteractiveTask implements Runnable {
 		}
 	}
 
-	private void printTopStack() throws IOException {
+	private void printTopThreadsStack() throws IOException {
 		try {
 			app.preventFlush();
-			app.view.printTopStack();
+			app.view.threadPrinter.printTopStack();
 			waitForEnter();
 		} finally {
 			app.continueFlush();
 		}
 	}
 
-	private void displayAllThreads() throws IOException {
+	private void printAllThreadsName() throws IOException {
 		try {
 			app.preventFlush();
-			app.view.printAllThreads();
+			app.view.threadPrinter.printAllThreads();
+			waitForEnter();
+		} finally {
+			app.continueFlush();
+		}
+	}
+
+	private void printBlockedThreadsStack() throws IOException {
+		try {
+			app.preventFlush();
+			app.view.threadPrinter.printBlockedThreads();
 			waitForEnter();
 		} finally {
 			app.continueFlush();
@@ -122,7 +142,8 @@ public class InteractiveTask implements Runnable {
 		String mode = readLine(
 				" Input number of Display Mode(1.cpu, 2.syscpu 3.total cpu 4.total syscpu 5.memory 6.total memory, current "
 						+ app.view.threadInfoMode + "): ");
-		ThreadInfoMode detailMode = ThreadInfoMode.parse(mode);
+		ThreadInfoMode detailMode = ThreadInfoMode.parseInt(mode);
+
 		if (detailMode == null) {
 			tty.println(" Wrong option for display mode(1-6)");
 		} else if (detailMode == app.view.threadInfoMode) {
@@ -135,8 +156,8 @@ public class InteractiveTask implements Runnable {
 				app.interruptSleep();
 			} else {
 				app.view.threadInfoMode = detailMode;
-				tty.println(" Display mode changed to " + app.view.threadInfoMode + " for next flush(" + app.nextFlushTime()
-						+ "s later)");
+				tty.println(" Display mode changed to " + app.view.threadInfoMode + " for next flush("
+						+ app.nextFlushTime() + "s later)");
 			}
 		}
 		app.continueFlush();
@@ -156,7 +177,7 @@ public class InteractiveTask implements Runnable {
 			int interval = Integer.parseInt(intervalStr);
 			if (interval != app.getInterval()) {
 				app.updateInterval(interval);
-				tty.println("Flush interval change to " + interval + " seconds");
+				tty.println(" Flush interval change to " + interval + " seconds");
 				app.interruptSleep();
 			} else {
 				tty.println(" Nothing be changed");
@@ -204,22 +225,24 @@ public class InteractiveTask implements Runnable {
 		}
 
 		app.view.threadNameFilter = threadNameFilter != null ? threadNameFilter.toLowerCase() : null;
-		tty.println("  thread name filter change to " + threadNameFilter + " for next flush (" + app.nextFlushTime()
+		tty.println(" Thread name filter change to " + threadNameFilter + " for next flush (" + app.nextFlushTime()
 				+ "s later)");
-
 
 		app.continueFlush();
 	}
 
 	private void printHelp() throws Exception {
 		app.preventFlush();
-		tty.println(" t [tid]: print stack trace of the thread you choose");
-		tty.println(" s : print stack trace of top " + app.view.threadLimit + " threads");
+		tty.println(" s [tid]: print stack trace of the thread you choose");
+		tty.println(" t : print stack trace of top " + app.view.threadLimit + " threads");
+		tty.println(" b : print stack trace of blocked threads");
 		tty.println(" a : list id and name of all threads");
+		tty.println(" ---------------");
 		tty.println(" m : change threads display mode and ordering");
 		tty.println(" i [num]: change flush interval seconds");
 		tty.println(" l [num]: change number of display threads");
 		tty.println(" f [name]: set thread name filter");
+		tty.println(" ---------------");
 		tty.println(" q : quit");
 		tty.println(" h : print help");
 		waitForEnter();
@@ -227,12 +250,11 @@ public class InteractiveTask implements Runnable {
 	}
 
 	private void waitForEnter() {
-		readLine(" Please hit <ENTER> to continue...");
+		inputWhenWaitForEnter = readLine(" Please hit <ENTER> to continue...");
 	}
 
 	private String readLine(String hints) {
 		String result = console.readLine(hints);
-
 		if (result != null) {
 			return result.trim();
 		}
